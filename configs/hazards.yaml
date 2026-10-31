@@ -1,0 +1,104 @@
+# LandProof hazard vocabulary.
+#
+# Muse Spark may only choose phrases from this file (enforced with a JSON-schema enum),
+# because free-form LLM prompts measurably hurt open-vocabulary segmentation
+# (arXiv 2606.21863). Run scripts/01_validate_vocab.py to score every phrase against
+# labeled frames; it writes configs/hazards.validated.yaml and only phrases that pass
+# are offered to the agent.
+#
+# id        : class index used by the distilled student model (0 = landable surface).
+# buffer_m  : keep-out distance added around every instance of this class.
+# mandatory : the verifier always checks this class, even if Spark forgets to.
+# dynamic   : objects that move; tracked by the descent watch.
+# fixed_vocab: true if the class exists in UAVid's fixed 8-class vocabulary (baseline).
+
+classes:
+  - name: landable
+    id: 0
+    buffer_m: 0.0
+    mandatory: false
+    dynamic: false
+    hazard: false
+    fixed_vocab: true
+    phrases: [grass, lawn, bare soil, dirt ground, gravel, sand, open field, empty paved courtyard]
+
+  - name: person
+    id: 1
+    buffer_m: 5.0
+    mandatory: true
+    dynamic: true
+    hazard: true
+    fixed_vocab: true
+    phrases: [person, pedestrian, people, child, crowd of people, person lying on the ground]
+
+  - name: vehicle
+    id: 2
+    buffer_m: 3.0
+    mandatory: true
+    dynamic: true
+    hazard: true
+    fixed_vocab: true
+    phrases: [car, motorcycle, scooter, auto rickshaw, truck, bus, bicycle, van, tractor]
+
+  - name: animal
+    id: 3
+    buffer_m: 3.0
+    mandatory: true
+    dynamic: true
+    hazard: true
+    fixed_vocab: false
+    phrases: [cow, dog, goat, cattle, buffalo, animal]
+
+  - name: water
+    id: 4
+    buffer_m: 1.5
+    mandatory: true
+    dynamic: false
+    hazard: true
+    fixed_vocab: false
+    phrases: [standing water, flood water, waterlogged road, puddle, pond, swimming pool, river, muddy water]
+
+  - name: wire_pole
+    id: 5
+    buffer_m: 4.0
+    mandatory: true
+    dynamic: false
+    hazard: true
+    fixed_vocab: false
+    phrases: [power line, electric pole, utility pole, street light, overhead cable, transmission tower]
+
+  - name: obstacle
+    id: 6
+    buffer_m: 1.5
+    mandatory: false
+    dynamic: false
+    hazard: true
+    fixed_vocab: false
+    phrases: [debris, construction material, water tank, tarpaulin, tent, umbrella, fence, wall, rubble, barricade, pile of bricks]
+
+  - name: tree
+    id: 7
+    buffer_m: 2.0
+    mandatory: false
+    dynamic: false
+    hazard: true
+    fixed_vocab: true
+    phrases: [tree, palm tree, shrub, bush, tree canopy]
+
+  - name: building
+    id: 8
+    buffer_m: 2.0
+    mandatory: false
+    dynamic: false
+    hazard: true
+    fixed_vocab: true
+    phrases: [building, roof, rooftop, house, shed]
+
+  - name: road
+    id: 9
+    buffer_m: 1.5
+    mandatory: false
+    dynamic: false
+    hazard: true
+    fixed_vocab: true
+    phrases: [road, street, highway, railway track]

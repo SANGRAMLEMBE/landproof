@@ -1,0 +1,54 @@
+# LandProof runtime configuration. Units are SI (metres, seconds, degrees).
+
+camera:
+  hfov_deg: 70.0          # nadir (straight-down) camera horizontal field of view
+  width: 960
+  height: 720
+
+airframe:
+  diameter_m: 0.9         # prop-tip to prop-tip, small delivery quad
+  touchdown_margin_m: 1.0
+  position_error_m_per_10m: 0.3   # horizontal uncertainty grows with altitude
+
+landing:
+  commit_altitude_m: 2.0          # below this the drone commits to touchdown
+  hold_seconds: 5.0               # pause when an intruder is near, then abort
+  predicted_entry_horizon_s: 3.0  # abort early if a tracked object will enter within this
+  abort_climb_rate_mps: 2.0
+  descent_rate_high_mps: 3.0
+  descent_rate_low_mps: 1.2
+  slow_below_m: 12.0
+
+scorer:
+  max_zones: 5
+  min_separation_m: 8.0
+  work_gsd_m: 0.10        # scorer works on a grid of this resolution
+  weights:
+    clearance: 0.55
+    landable: 0.25
+    proximity: 0.20
+    smoothness: 0.0       # texture smoothness rewards water -- keep at 0 for LandProof
+
+verifier:
+  min_confidence: 0.25
+  crop_zoom: true         # re-check claims on an upsampled crop around the zone
+  crop_context_m: 10.0
+  crop_size_px: 1024
+
+atlas:
+  certificate_ttl_s: 180
+  max_agent_turns: 10
+
+watch:
+  intrusion_frames: 2           # consecutive frames needed to confirm an intrusion
+  egomotion_min_inliers: 25
+  divert_threat_clearance_m: 12.0   # skip atlas zones on a tracked intruder's projected path
+  student_input_px: 512
+
+models:
+  spark: muse-spark-1.3
+  sam: sam-3.1
+  image: muse-image-1.0
+  glimmer: muse-glimmer
+  spark_effort_planning: low    # never xhigh inside a loop (~38 s to first token)
+  spark_max_tokens: 6000        # reasoning tokens count against this budget
