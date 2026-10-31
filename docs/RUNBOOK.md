@@ -4,6 +4,20 @@ Deadline: **Wed Nov 4, 9:00 PM ET = Thu Nov 5, 7:30 AM IST.** Plan to submit by
 **Wed 10 PM IST**. Office hours run 10–11 AM ET (7:30–8:30 PM IST) on weekdays. Tue
 Nov 3 is the last troubleshooting day.
 
+## Running from VS Code (Windows, Mac or Linux)
+
+1. Install Python 3.11 or 3.12 and Git. Open the `landproof` folder in VS Code and open a terminal (Ctrl+`).
+2. Create the environment:
+   - Windows: `py -3.12 -m venv .venv` then `.venv\Scripts\activate`
+   - Mac/Linux: `python3 -m venv .venv && source .venv/bin/activate`
+3. If you have an NVIDIA GPU, install CUDA PyTorch **first**: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126`. On Windows, plain `pip install torch` gives you a CPU-only build.
+4. `pip install -e ".[student,dev]"`
+5. Copy `.env.example` to `.env` and paste `MODEL_API_KEY=...`. `.env` is git-ignored; never commit it and never paste the key into code or chat.
+6. VS Code: Ctrl+Shift+P → "Python: Select Interpreter" → `.venv`. The Run and Debug panel (Ctrl+Shift+D) has ready configurations: *Check Meta API access*, *Offline demo*, *Atlas with Muse Spark + SAM 3.1*, *Demo: real models in the simulator*, *Tests*.
+7. Always run commands from the repo root (caches go to `cache/`, outputs to `runs/`).
+
+If something fails on a live API call, copy the traceback (it never contains your key) and send it to Claude.
+
 ## Saturday Oct 31 (tonight): go/no-go
 
 ```bash

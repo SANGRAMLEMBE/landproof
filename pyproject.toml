@@ -22,6 +22,7 @@ dependencies = [
   "tqdm>=4.66",
   "openai>=1.40",
   "meta-sam-parser>=0.1.0",
+  "imageio-ffmpeg>=0.5",   # bundled ffmpeg for MP4 export (Windows has no system ffmpeg)
 ]
 
 [project.optional-dependencies]
