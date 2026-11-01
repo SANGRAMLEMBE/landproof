@@ -43,6 +43,8 @@ class Scenario:
     fps: float = 15.0
     seed: int = 1
     human_abort_t: float | None = None
+    voice_text: str | None = None          # operator's words at human_abort_t (Muse Voice Transcribe transcript)
+    voice_source: str = "Muse Voice Transcribe"
 
 
 def monsoon_scenario(link_down_t: float | None = 45.0) -> Scenario:
@@ -109,12 +111,18 @@ def run_scenario(world: World, sc: Scenario, cfg: dict, vocab: Vocabulary, *, sa
     edge = glimmer
     watch = DescentWatch(vocab, cfg, cam, air, atlas, student, ledger, recertifier=recert, edge_gate=edge, transit_alt_m=None)
     ledger.append("emergency", {"cause": "battery critical", "battery_pct": sc.battery_start}, t_sim=0.0)
-    states, abort_t, first_threat_gt, zone_true = [], None, None, {}
+    states, abort_t, first_threat_gt, zone_true, voice_banner = [], None, None, {}, None
     per_frame_ms = []
     while not watch.done and sim.t < sc.max_t:
         link_up = sc.link_down_t is None or sim.t < sc.link_down_t
         if sc.human_abort_t is not None and abs(sim.t - sc.human_abort_t) < 0.5 / sc.fps:
-            watch.human_command("abort")
+            from .meta.voice import parse_command
+
+            cmd_h = parse_command(sc.voice_text) if sc.voice_text else "abort"
+            ledger.append("human_voice", {"transcript": sc.voice_text, "command": cmd_h, "source": sc.voice_source if sc.voice_text else "button"}, t_sim=sim.t)
+            if cmd_h:
+                watch.human_command(cmd_h, f'"{sc.voice_text}"' if sc.voice_text else "operator button")
+                voice_banner = (sim.t, f'HUMAN OVERRIDE ({sc.voice_source}): "{sc.voice_text}" -> ABORT' if sc.voice_text else "HUMAN OVERRIDE -> ABORT")
         recert.label = obs.label
         if hasattr(edge, "set_label"):
             edge.set_label(obs.label)
@@ -135,7 +143,8 @@ def run_scenario(world: World, sc: Scenario, cfg: dict, vocab: Vocabulary, *, sa
                 print(f"  t={sim.t:6.2f} alt={obs.pose_true.alt:5.1f}  {e}")
         if writer:
             batt = max(0.0, sc.battery_start - sc.battery_drain_pct_s * sim.t)
-            writer.write(hud.render(obs.rgb, rep, battery_pct=batt))
+            vb = voice_banner[1] if voice_banner and sim.t - voice_banner[0] < 3.5 else None
+            writer.write(hud.render(obs.rgb, rep, battery_pct=batt, extra_banner=vb))
         states.append(rep.state.value)
         obs = sim.step(cmd)
     if writer:

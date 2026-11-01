@@ -28,6 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 student = ["torch>=2.2", "torchvision>=0.17"]
 modal = ["modal>=1.0"]
+voice = ["websockets>=13"]
 dev = ["pytest>=8.0"]
 
 [tool.setuptools.packages.find]

@@ -24,7 +24,7 @@ import numpy as np  # noqa: E402
 from landproof.backends import make_glimmer, make_sam, make_spark, make_student  # noqa: E402
 from landproof.config import load_config  # noqa: E402
 from landproof.demo import monsoon_scenario, run_scenario  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.sim.replay import Pose  # noqa: E402
 from landproof.sim.scene import World, make_world  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402
@@ -44,6 +44,10 @@ def main():
     ap.add_argument("--start", default=None, help="x,y in metres")
     ap.add_argument("--alt", type=float, default=80.0)
     ap.add_argument("--speed", type=float, default=1.5, help="video playback speed")
+    ap.add_argument("--voice-at", type=float, default=None, help="sim time of the operator's spoken override")
+    ap.add_argument("--voice-wav", help="16-bit WAV of the operator speaking (transcribed by Muse Voice Transcribe)")
+    ap.add_argument("--voice-lang", default=None, help="e.g. ta, hi, en")
+    ap.add_argument("--voice-text", help="skip transcription and use this text (offline)")
     ap.add_argument("--out", default="runs/demo")
     a = ap.parse_args()
     cfg, vocab = load_config(), Vocabulary.load()
@@ -61,6 +65,17 @@ def main():
         sc.start = Pose(*world.start_xy_m, a.alt, 0.0)
     if a.no_intruder:
         sc.actors = []
+    if a.voice_at is not None:
+        sc.human_abort_t = a.voice_at
+        if a.voice_wav:
+            from landproof.config import load_env
+            from landproof.meta.voice import transcribe_wav
+
+            load_env()
+            sc.voice_text = transcribe_wav(a.voice_wav, a.voice_lang)
+            print(f"[voice] Muse Voice Transcribe heard: {sc.voice_text!r}")
+        else:
+            sc.voice_text, sc.voice_source = a.voice_text, "typed (offline)"
     mode = "SIMULATION (oracle evidence)" if a.evidence == "oracle" else f"SIMULATION ({a.evidence} evidence)"
     s = run_scenario(world, sc, cfg, vocab, sam=make_sam(a.evidence, vocab, cfg), student=make_student(a.student, cfg), planner=a.planner,
                      spark=make_spark(a.planner, cfg), glimmer=make_glimmer(a.glimmer, vocab), out_dir=a.out, mode_label=mode, playback_speed=a.speed)

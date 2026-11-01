@@ -35,6 +35,7 @@ it can be wrong, and nobody can audit it.
 | **Proof** | per claim | SAM 3.1 segments each claimed-absent hazard. A deterministic verifier refutes any claim with an instance inside radius + class buffer. Mandatory classes are always checked. A zone is certified only if **every** claim survives. | **SAM 3.1** (Meta Model API) |
 | **Descent watch** | every frame, onboard | A student model trained only on SAM 3.1 pseudo-labels, plus ego-motion compensation and ground-frame tracking. It predicts when a person will walk into the zone, then **holds**, **aborts** and **diverts** to the next certified zone, skipping any zone on the intruder's path. | student distilled from **SAM 3.1** |
 | **Edge mode** | cloud link lost | Muse Glimmer re-checks the zone crop with a structured yes/no. It can **veto**, never approve. | **Muse Glimmer** (open weights, vLLM) |
+| **Human override** | any time | The operator's spoken "stop", in English, Tamil or Hindi, aborts immediately. The human outranks every model. | **Muse Voice Transcribe** |
 | **HazardForge** | offline | Muse Image inserts traps into real frames. SAM 3.1 must confirm every trap before it counts. Spark designs the next round from what fooled the system. | **Muse Image**, **SAM 3.1**, **Muse Spark** |
 
 **Authority order:** human > deterministic verifier > student > LLM.
@@ -109,7 +110,7 @@ your API key:
 git clone https://github.com/SANGRAMLEMBE/landproof && cd landproof
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[student,dev]"
-pytest                                   # 15 offline tests, under a minute on CPU
+pytest                                   # 27 offline tests, about a minute on CPU
 
 # offline demo: no keys, oracle evidence, clearly labelled on the HUD
 python scripts/05_descent_demo.py --evidence oracle --student oracle --glimmer oracle
@@ -119,7 +120,7 @@ python scripts/05_descent_demo.py --evidence oracle --student oracle --glimmer o
 **With Meta models:**
 
 ```bash
-cp .env.example .env                     # add MODEL_API_KEY
+cp .env.example .env                     # add MODEL_API_KEY; spend is capped at LANDPROOF_BUDGET_USD (docs/BUDGET.md)
 python scripts/00_check_access.py        # go/no-go for sam-3.1 + muse-spark-1.3 (~$0.01)
 python scripts/04_build_atlas.py --image frame.jpg --alt 60 --planner spark   # watch Spark use the tools
 python scripts/05_descent_demo.py --evidence meta-api --planner spark --student checkpoints/student_sam.pt --glimmer remote

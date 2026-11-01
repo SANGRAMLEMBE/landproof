@@ -1,4 +1,4 @@
-"""Meta Model API client factory, retries, image encoding and a credit meter."""
+"""Meta Model API client factory, retries and image encoding. Spend is tracked in landproof.budget."""
 
 from __future__ import annotations
 
@@ -6,23 +6,14 @@ import base64
 import io
 import os
 import random
-import threading
 import time
-from dataclasses import dataclass, field
 
 import numpy as np
 from PIL import Image
 
 DEFAULT_BASE = "https://api.meta.ai/v1"
 
-# USD, from public pricing summaries (Oct 2026). Verify on your Billing page.
-PRICES = {
-    "sam-3.1/image": 2.50 / 1000,
-    "sam-3.1/video_frame": 0.20 / 1000,
-    "muse-spark-1.3/in": 1.25 / 1e6,
-    "muse-spark-1.3/out": 4.25 / 1e6,
-    "muse-image-1.0/image": 0.01,
-}
+from ..budget import BUDGET, PRICES  # noqa: F401  (re-exported)
 
 
 def api_key() -> str:
@@ -75,22 +66,5 @@ def decode_b64_image(b64: str) -> np.ndarray:
     return np.array(Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB"))
 
 
-@dataclass
-class CreditMeter:
-    """Approximate spend tracker so a long autolabel run never surprises you."""
-
-    usd: float = 0.0
-    calls: dict = field(default_factory=dict)
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
-
-    def add(self, key: str, units: float = 1.0) -> None:
-        with self._lock:
-            self.usd += PRICES.get(key, 0.0) * units
-            self.calls[key] = self.calls.get(key, 0) + units
-
-    def report(self) -> str:
-        parts = ", ".join(f"{k}: {v:g}" for k, v in sorted(self.calls.items()))
-        return f"~${self.usd:.3f} ({parts})"
-
-
-METER = CreditMeter()
+# Back-compat name: every script prints METER.report(); it is the persistent budget guard.
+METER = BUDGET

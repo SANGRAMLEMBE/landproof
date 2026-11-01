@@ -21,11 +21,11 @@ from landproof.agents.atlas_agent import AtlasAgent  # noqa: E402
 from landproof.backends import make_sam, make_spark, make_student  # noqa: E402
 from landproof.bench.strategies import FlattestPatch, LandProofStrategy, MaskScorer  # noqa: E402
 from landproof.config import load_config  # noqa: E402
-from landproof.data.autolabel import autolabel_image  # noqa: E402
+from landproof.data.autolabel import autolabel_image, choose_phrases  # noqa: E402
 from landproof.data.datasets import camera_frame, load_rgb  # noqa: E402
 from landproof.forge.hazardforge import SEED_TRAPS, HazardForge, failure_table  # noqa: E402
 from landproof.geometry import Airframe, Camera  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.meta.image import MuseImage  # noqa: E402
 from landproof.verifier import Verifier  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402
@@ -57,6 +57,9 @@ def main():
         st = make_student(a.student, cfg)
         strategies["student"] = MaskScorer("student", vocab, cfg, air, lambda rgb, ctx: st.predict(rgb))
 
+    # per trap: 1 Muse Image edit + ~2 SAM checks + 2 atlases (~25 each) + trap labelling (~20)
+    METER.preflight({"muse-image-1.0/image": a.rounds * a.per_round, "sam-3.1/image": a.rounds * a.per_round * 72,
+                     "usd": 0.04 * a.rounds if a.spark else 0.0}, f"HazardForge {a.rounds}x{a.per_round} traps")
     specs = [dict(s) for s in SEED_TRAPS][: a.per_round]
     pair_dir = Path(a.out) / "train_pairs"
     (pair_dir / "images").mkdir(parents=True, exist_ok=True)
@@ -73,7 +76,7 @@ def main():
             trap, frame, hazard = forge.make_trap(rgb, atlas.entries[0].zone.center_px, gsd, spec, f"r{r}_{k:02d}_{name}", r)
             if trap.accepted:
                 forge.evaluate(trap, frame, hazard, gsd, alt, strategies, air)
-                label, _ = autolabel_image(frame, sam, vocab)
+                label, _ = autolabel_image(frame, sam, vocab, choose_phrases(vocab, 2))
                 cv2.imwrite(str(pair_dir / "images" / f"{trap.trap_id}.jpg"), cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(str(pair_dir / "labels" / f"{trap.trap_id}.png"), label)
             traps.append(trap)

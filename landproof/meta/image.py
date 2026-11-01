@@ -33,6 +33,7 @@ class MuseImage:
                 raise err
             return r.json()
 
+        METER.reserve("muse-image-1.0/image")
         data = with_retries(call, attempts=4)
         METER.add("muse-image-1.0/image")
         return decode_b64_image(data["data"][0]["b64_json"])

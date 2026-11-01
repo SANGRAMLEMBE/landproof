@@ -21,7 +21,7 @@ from landproof.bench.strategies import BlindLand, FlattestPatch, LandProofStrate
 from landproof.config import load_config  # noqa: E402
 from landproof.data.datasets import DEFAULT_GSD, camera_frame, list_samples, load_label, load_rgb  # noqa: E402
 from landproof.geometry import Airframe, Camera  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.meta.sam import OracleSam  # noqa: E402
 from landproof.verifier import Verifier  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402
@@ -69,6 +69,8 @@ def main():
             frames.append(Frame(s.sample_id, rgb, lab, gsd, cam.altitude_for_gsd(gsd, rgb.shape[1]), a.source))
     print(f"{len(frames)} frames from {a.source}")
 
+    if a.evidence == "meta-api":  # ~10 full-frame phrases + 3 zones x 5 zoomed claims per frame; cached frames are free
+        METER.preflight({"sam-3.1/image": len(frames) * 25, "usd": len(frames) * (0.08 if a.planner == "spark" else 0.0)}, f"LandBench {len(frames)} frames")
     sam = make_sam(a.evidence, vocab, cfg)
     spark = make_spark(a.planner, cfg)
 

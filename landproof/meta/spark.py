@@ -37,6 +37,7 @@ class SparkClient:
         if tools:
             args["tools"] = tools
             args["parallel_tool_calls"] = True
+        METER.reserve("muse-spark-1.3/out", usd=0.06)
         resp = with_retries(lambda: self.client.chat.completions.create(**args))
         self._usage(resp)
         return resp.choices[0].message
@@ -49,6 +50,7 @@ class SparkClient:
             max_tokens=self.max_tokens,
             response_format={"type": "json_schema", "json_schema": {"name": name, "schema": schema}},
         )
+        METER.reserve("muse-spark-1.3/out", usd=0.04)
         resp = with_retries(lambda: self.client.chat.completions.create(**args))
         self._usage(resp)
         content = resp.choices[0].message.content or ""

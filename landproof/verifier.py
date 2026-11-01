@@ -50,6 +50,9 @@ class Verifier:
         self.crop_zoom = bool(v["crop_zoom"])
         self.crop_context_m = float(v["crop_context_m"])
         self.crop_size_px = int(v["crop_size_px"])
+        # zoomed re-checks only where small objects hide (people, animals, vehicles, wires, debris);
+        # large classes (water, roads, buildings, trees) reuse the cached full-frame evidence
+        self.crop_classes = set(v.get("crop_zoom_classes", ["person", "animal", "vehicle", "wire_pole", "obstacle"]))
         self.ledger = ledger
         self.models = dict(cfg.get("models", {}))
 
@@ -127,7 +130,7 @@ class Verifier:
         all_claims = list(claims) + added
         region = self._region(zone, gsd_m, image.shape)
 
-        results = [self.check_claim(image, digest, c, zone, gsd_m, region) for c in all_claims]
+        results = [self.check_claim(image, digest, c, zone, gsd_m, region if c.hazard_class in self.crop_classes else None) for c in all_claims]
 
         reasons = []
         cx, cy = zone.center_px

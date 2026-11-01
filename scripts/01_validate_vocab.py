@@ -22,7 +22,7 @@ from landproof.backends import make_sam  # noqa: E402
 from landproof.config import CONFIG_DIR, load_config  # noqa: E402
 from landproof.data.autolabel import phrase_quality  # noqa: E402
 from landproof.data.datasets import list_samples, load_label, load_rgb  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402
 
 
@@ -44,6 +44,8 @@ def main():
         sys.exit("no labeled samples found - check --root/--split")
     print(f"{len(samples)} frames x {len(vocab.all_phrases)} phrases = {len(samples) * len(vocab.all_phrases)} SAM calls (~${len(samples) * len(vocab.all_phrases) * 0.0025:.2f})")
 
+    if a.evidence == "meta-api":  # only phrases whose class is present in a frame are scored (~70%)
+        METER.preflight({"sam-3.1/image": len(samples) * len(vocab.all_phrases) * 0.7}, "vocabulary validation")
     acc = {p: [] for p in vocab.all_phrases}
     for s in samples:
         rgb = load_rgb(s.image_path, a.max_side)
@@ -55,22 +57,38 @@ def main():
             acc[p].append(phrase_quality(rgb, gt, p, sam, vocab))
         print(f"  {s.sample_id}: done ({METER.report()})")
 
-    prev = Vocabulary.load(CONFIG_DIR / "hazards.validated.yaml") if a.merge and (CONFIG_DIR / "hazards.validated.yaml").exists() else None
+    prev = None
+    if a.merge and (CONFIG_DIR / "hazards.validated.yaml").exists():
+        prev = {c.name: c.stats for c in Vocabulary.load(CONFIG_DIR / "hazards.validated.yaml").classes}
     for c in vocab.classes:
         stats = {}
         for p in c.phrases:
-            rows = acc[p]
-            agg = {k: float(np.nanmean([r[k] for r in rows])) if rows else float("nan") for k in ("iou", "precision", "recall")}
-            agg["n"] = len(rows)
-            if prev and p in prev.by_name[c.name].stats:
-                agg = {"dataset": a.dataset, **agg, "previous": prev.by_name[c.name].stats[p]}
-            stats[p] = {k: (None if isinstance(v, float) and math.isnan(v) else (round(v, 4) if isinstance(v, float) else v)) for k, v in agg.items()}
-        small = c.dynamic
-        keep = [p for p in c.phrases if stats[p]["n"] and ((stats[p]["iou"] or 0) >= 0.30 or (small and (stats[p]["recall"] or 0) >= 0.5 and (stats[p]["precision"] or 0) >= 0.3))]
-        if not keep:
-            scored = [p for p in c.phrases if stats[p]["n"]]
-            keep = [max(scored, key=lambda p: stats[p]["iou"] or 0)] if scored else c.phrases[:1]
-            stats[keep[0]]["weak"] = True
+            rows = list(acc[p])
+            old = (prev or {}).get(c.name, {}).get(p) or {}
+            # merge with an earlier dataset: weight each metric by its number of frames
+            n_old = int(old.get("n") or 0)
+            agg = {}
+            for k in ("iou", "precision", "recall"):
+                vals = [r[k] for r in rows if not math.isnan(r[k])]
+                tot, n = sum(vals), len(vals)
+                if n_old and old.get(k) is not None:
+                    tot, n = tot + old[k] * n_old, n + n_old
+                agg[k] = round(tot / n, 4) if n else None
+            agg["n"] = len(rows) + n_old
+            agg["datasets"] = sorted(set(old.get("datasets", [])) | ({a.dataset} if rows else set()))
+            stats[p] = agg
+        scored = [p for p in c.phrases if stats[p]["n"]]
+        if not scored:
+            # no labelled example of this class in the data: keep every phrase, flagged unvalidated
+            keep = list(c.phrases)
+            for p in keep:
+                stats[p]["unvalidated"] = True
+        else:
+            keep = [p for p in scored if (stats[p]["iou"] or 0) >= 0.30 or (c.dynamic and (stats[p]["recall"] or 0) >= 0.5 and (stats[p]["precision"] or 0) >= 0.3)]
+            if not keep:
+                keep = [max(scored, key=lambda p: stats[p]["iou"] or 0)]
+                stats[keep[0]]["weak"] = True
+            keep += [p for p in c.phrases if not stats[p]["n"]]  # untested phrases are not punished
         c.stats = {p: stats[p] for p in c.phrases}
         print(f"{c.name:10s} keep {keep}  dropped {[p for p in c.phrases if p not in keep]}")
         c.phrases = keep

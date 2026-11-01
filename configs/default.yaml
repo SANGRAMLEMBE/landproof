@@ -34,10 +34,12 @@ verifier:
   crop_zoom: true         # re-check claims on an upsampled crop around the zone
   crop_context_m: 10.0
   crop_size_px: 1024
+  crop_zoom_classes: [person, animal, vehicle, wire_pole, obstacle]
 
 atlas:
   certificate_ttl_s: 180
   max_agent_turns: 10
+  claims_top_k: 3          # scripted planner certifies the 3 best-scored zones (cost control)
 
 watch:
   intrusion_frames: 2           # consecutive frames needed to confirm an intrusion

@@ -113,6 +113,7 @@ class DescentWatch:
         self.pending = None
         self.frame_i = 0
         self.human_abort = False
+        self.human_note = ""
         self.done = False
         self.outcome: dict = {}
         self.yaw_K0 = 0.0
@@ -135,10 +136,11 @@ class DescentWatch:
             self.state = s
             self.state_since = t
 
-    def human_command(self, cmd: str):
-        """Human operator always wins (e.g. voice 'abort' via Muse Voice Transcribe)."""
+    def human_command(self, cmd: str, note: str = ""):
+        """Human operator always wins (e.g. a spoken 'stop' transcribed by Muse Voice Transcribe)."""
         if cmd.lower().strip() in {"abort", "stop", "climb"}:
             self.human_abort = True
+            self.human_note = note
 
     def _servo(self, zone_px, gsd, yaw_deg, gain=0.8, vmax=2.5):
         ex = (zone_px[0] - self.cam.width / 2.0) * gsd
@@ -168,7 +170,7 @@ class DescentWatch:
             self.human_abort = False
             self.failed.add(self.entry.zone_id if self.entry else "")
             self.abort_alt = alt + 8.0
-            self._goto(State.ABORT, t, events, "human operator command")
+            self._goto(State.ABORT, t, events, "human override" + (f": {self.human_note}" if self.human_note else ""))
 
         # ---------------------------------------------------------- DIVERT: choose next zone
         if self.state == State.DIVERT:

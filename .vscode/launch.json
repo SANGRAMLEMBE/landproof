@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "0. Check Meta API access (~$0.05)",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}", "envFile": "${workspaceFolder}/.env",
+      "program": "scripts/00_check_access.py", "args": ["--image"], "console": "integratedTerminal"
+    },
+    {
+      "name": "Show spend vs $130 cap",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}", "envFile": "${workspaceFolder}/.env",
+      "program": "scripts/spend.py", "console": "integratedTerminal"
+    },
+    {
+      "name": "Offline demo (free, oracle evidence)",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}",
+      "program": "scripts/05_descent_demo.py", "args": ["--evidence", "oracle", "--student", "oracle", "--glimmer", "oracle"], "console": "integratedTerminal"
+    },
+    {
+      "name": "Atlas: Muse Spark + SAM 3.1 on synthetic frame (~$0.15)",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}", "envFile": "${workspaceFolder}/.env",
+      "program": "scripts/04_build_atlas.py", "args": ["--synthetic", "--planner", "spark", "--evidence", "meta-api", "--out", "runs/atlas_spark_synthetic"], "console": "integratedTerminal"
+    },
+    {
+      "name": "Demo: real Meta models in the simulator (~$0.40)",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}", "envFile": "${workspaceFolder}/.env",
+      "program": "scripts/05_descent_demo.py", "args": ["--evidence", "meta-api", "--planner", "spark", "--student", "oracle", "--glimmer", "oracle", "--out", "runs/demo_meta"], "console": "integratedTerminal"
+    },
+    {
+      "name": "Tests (free)",
+      "type": "debugpy", "request": "launch", "cwd": "${workspaceFolder}", "module": "pytest", "args": ["-q"], "console": "integratedTerminal"
+    }
+  ]
+}

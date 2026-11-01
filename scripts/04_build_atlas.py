@@ -20,7 +20,7 @@ from landproof.config import load_config  # noqa: E402
 from landproof.data.datasets import camera_frame, load_rgb  # noqa: E402
 from landproof.geometry import Airframe, Camera  # noqa: E402
 from landproof.ledger import Ledger  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.verifier import Verifier  # noqa: E402
 from landproof.viz.overlay import zones_overlay  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402

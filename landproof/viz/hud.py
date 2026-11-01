@@ -53,6 +53,18 @@ def font(size: int, bold: bool = False):
     return ImageFont.load_default(size=size)
 
 
+@lru_cache(maxsize=8)
+def font_indic(size: int):
+    """A font with Tamil/Devanagari glyphs if the OS has one (Windows: Nirmala UI)."""
+    cands = ["C:/Windows/Fonts/Nirmala.ttf", "C:/Windows/Fonts/NirmalaB.ttf", "/usr/share/fonts/truetype/noto/NotoSansTamil-Regular.ttf",
+             "/usr/share/fonts/truetype/lohit-tamil/Lohit-Tamil.ttf", "/System/Library/Fonts/Supplemental/Tamil Sangam MN.ttc",
+             "/Library/Fonts/Arial Unicode.ttf"]
+    for p in cands:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
+    return font(size, True)
+
+
 def _dashed_circle(img, c, r, color, th=2, dash_deg=12):
     for a in range(0, 360, dash_deg * 2):
         cv2.ellipse(img, (int(c[0]), int(c[1])), (int(r), int(r)), 0, a, a + dash_deg, color, th, cv2.LINE_AA)
@@ -119,7 +131,9 @@ class Hud:
         if self.banner and rep.t - self.banner[2] < 3.5:
             self._bar(d, 40 if not rep.link_up else 0, self.banner[0].upper()[:70], self.banner[1])
         if extra_banner:
-            self._bar(d, self.ch - 84, extra_banner, C_CYAN)
+            d.rectangle([0, self.ch - 84, self.cw, self.ch - 46], fill=(0, 0, 0))
+            d.rectangle([0, self.ch - 84, 8, self.ch - 46], fill=C_CYAN)
+            d.text((20, self.ch - 78), extra_banner[:80], font=font_indic(21), fill=C_CYAN)
         d.text((14, self.ch - 30), f"{self.mode}  |  t = {rep.t:5.1f} s", font=font(16, True), fill=C_TEXT, stroke_width=3, stroke_fill=(0, 0, 0))
         cam = np.array(img)
 

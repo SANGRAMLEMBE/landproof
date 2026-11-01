@@ -177,7 +177,8 @@ class AtlasAgent:
         phrases = [c.default_phrase for c in self.vocab.hazard_classes] + [self.vocab.by_name["landable"].default_phrase]
         self._dispatch(s, "segment_concepts", {"phrases": phrases})
         self._dispatch(s, "propose_zones", {})
-        for zid in list(s.zones):
+        top = sorted(s.zones.values(), key=lambda z: -z.score)[: int(self.cfg["atlas"].get("claims_top_k", 3))]
+        for zid in [z.zone_id for z in top]:
             absent = [c.default_phrase for c in self.vocab.hazard_classes]
             self._dispatch(s, "submit_claims", {"zone_id": zid, "absent_phrases": absent, "rationale": "scripted planner: all classes"})
         ranked = [z for z in s.zones if s.certs.get(z) and s.certs[z].passed]
@@ -219,6 +220,10 @@ class AtlasAgent:
                 msgs.append({"role": "tool", "tool_call_id": c.id, "content": json.dumps(res)})
                 show_overlay |= c.function.name in ("propose_zones", "submit_claims")
             if show_overlay and s.zones:
+                # keep only the newest overlay image in context (each image costs input tokens every turn)
+                for m in msgs:
+                    if m.get("role") == "user" and isinstance(m.get("content"), list) and m["content"] and str(m["content"][0].get("text", "")).startswith("Overlay"):
+                        m["content"] = [{"type": "text", "text": "Overlay (older version removed)."}]
                 ov = zones_overlay(s.rgb, list(s.zones.values()), certs=s.certs)
                 msgs.append({"role": "user", "content": [{"type": "text", "text": "Overlay: cyan = candidate, green = PASS, red = FAIL."}, image_part(ov)]})
             if s.final is not None:

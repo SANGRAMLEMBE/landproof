@@ -12,8 +12,8 @@ Nov 3 is the last troubleshooting day.
    - Mac/Linux: `python3 -m venv .venv && source .venv/bin/activate`
 3. If you have an NVIDIA GPU, install CUDA PyTorch **first**: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126`. On Windows, plain `pip install torch` gives you a CPU-only build.
 4. `pip install -e ".[student,dev]"`
-5. Copy `.env.example` to `.env` and paste `MODEL_API_KEY=...`. `.env` is git-ignored; never commit it and never paste the key into code or chat.
-6. VS Code: Ctrl+Shift+P → "Python: Select Interpreter" → `.venv`. The Run and Debug panel (Ctrl+Shift+D) has ready configurations: *Check Meta API access*, *Offline demo*, *Atlas with Muse Spark + SAM 3.1*, *Demo: real models in the simulator*, *Tests*.
+5. Copy `.env.example` to `.env` and paste `MODEL_API_KEY=...` (keep `LANDPROOF_BUDGET_USD=130`). `.env` is git-ignored; never commit it and never paste the key into code or chat. Also set a $130 Spend Limit on the Billing page.
+6. VS Code: Ctrl+Shift+P → "Python: Select Interpreter" → `.venv`. The Run and Debug panel (Ctrl+Shift+D) has ready configurations: *Check Meta API access*, *Show spend*, *Offline demo*, *Atlas: Muse Spark + SAM 3.1*, *Demo: real Meta models in the simulator*, *Tests*.
 7. Always run commands from the repo root (caches go to `cache/`, outputs to `runs/`).
 
 If something fails on a live API call, copy the traceback (it never contains your key) and send it to Claude.
@@ -42,11 +42,13 @@ python scripts/00_check_access.py --image # one Muse Image edit
 - **Kill criterion:** if `00_check_access` fails from India by Sunday noon, post in `#questions`, then use `--evidence local` (SAM open weights on a GPU) for labelling.
 
 ```bash
-# 3. vocabulary validation (~$3) - start before you sleep
+# 3. vocabulary validation (~$4-5): FloodNet has no people/animals/wires, ICG does
 python scripts/01_validate_vocab.py --dataset floodnet --root data/FloodNet --split val --n 20
 python scripts/01_validate_vocab.py --dataset icg --root data/semantic_drone --n 15 --merge
-# 4. auto-label overnight (~$0.0025 x images x validated phrases; cached, resumable)
-python scripts/02_autolabel.py --dataset floodnet --root data/FloodNet --split train --out data/pseudo/floodnet_train --limit 300
+# 4. cheap labelling: check packed-video mode against per-image mode (~$0.70), then bulk (~$4-15)
+python scripts/02_autolabel.py --dataset floodnet --root data/FloodNet --split train --ab-check 10
+python scripts/02_autolabel.py --dataset floodnet --root data/FloodNet --split train --out data/pseudo/floodnet_train --limit 300 --mode auto
+python scripts/spend.py                   # spent vs the $130 cap (see docs/BUDGET.md)
 ```
 
 ## Sunday Nov 1: student, Glimmer, Spark atlas, footage
@@ -78,6 +80,10 @@ Post the X teaser: a 10 s clip of the HUD hold/abort from the sim, with "buildin
 ## Monday Nov 2: experiments
 
 ```bash
+# operator's spoken override, transcribed by Muse Voice Transcribe (record 2-3 s on your phone, convert to 16 kHz WAV)
+#   ffmpeg -i stop.m4a -ac 1 -ar 16000 -sample_fmt s16 data/voice/stop_ta.wav ;  pip install -e ".[voice]"
+python scripts/05_descent_demo.py --evidence oracle --student oracle --glimmer oracle --voice-at 31.5 --voice-wav data/voice/stop_ta.wav --voice-lang ta --out runs/demo_voice
+
 # real footage in shadow mode (SAM 3.1 video tracks for movers + Spark atlas on frame 0)
 python scripts/08_shadow_mode.py --video data/footage/DJI_0042.MP4 --srt data/footage/DJI_0042.SRT --planner spark --stride 2 --out runs/shadow_take1
 

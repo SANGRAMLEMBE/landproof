@@ -19,7 +19,7 @@ import cv2  # noqa: E402
 
 from landproof.backends import make_glimmer, make_sam, make_spark, make_student  # noqa: E402
 from landproof.config import load_config  # noqa: E402
-from landproof.meta.client import METER  # noqa: E402
+from landproof.budget import BUDGET as METER  # noqa: E402
 from landproof.shadow import run_shadow  # noqa: E402
 from landproof.sim.footage import FootageConfig, PrecomputedSamStudent  # noqa: E402
 from landproof.vocab import Vocabulary  # noqa: E402
@@ -50,6 +50,10 @@ def main():
         if cache.exists():
             tracks = pickle.loads(cache.read_bytes())
         else:
+            cap = cv2.VideoCapture(a.video)
+            n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            cap.release()
+            METER.preflight({"sam-3.1/video_frame": max(50, n) * len(MOVERS), "sam-3.1/image": 30}, f"shadow mode ({n} frames x {len(MOVERS)} movers)")
             tracks = {p: sam.segment_video(a.video, p) for p in MOVERS}
             cache.parent.mkdir(parents=True, exist_ok=True)
             cache.write_bytes(pickle.dumps(tracks))

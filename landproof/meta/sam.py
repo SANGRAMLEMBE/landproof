@@ -111,8 +111,12 @@ def parse_sam_output(text: str, video: bool = False, phrase: str = "", backend: 
 class MetaApiSam(SamBackend):
     name = "sam-3.1@meta-api"
 
-    def __init__(self, model: str = "sam-3.1", cache_dir: str | Path | None = "cache/sam", max_side: int = 2048, mask_encoding: str = "lossless"):
+    def __init__(self, model: str = "sam-3.1", cache_dir: str | Path | None = "default", max_side: int = 2048, mask_encoding: str = "lossless"):
+        from ..config import REPO_ROOT
+
         self.model = model
+        if cache_dir == "default":
+            cache_dir = REPO_ROOT / "cache" / "sam"
         self.cache_dir = Path(cache_dir) if cache_dir else None
         if self.cache_dir:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -153,6 +157,7 @@ class MetaApiSam(SamBackend):
             ],
             "metadata": {"include_confidence": "true", "mask_encoding": self.mask_encoding},
         }
+        METER.reserve("sam-3.1/image")
         resp = with_retries(lambda: self.client.responses.create(**payload))
         METER.add("sam-3.1/image")
         text = _output_text(resp)
@@ -164,17 +169,40 @@ class MetaApiSam(SamBackend):
             cp.write_bytes(pickle.dumps(insts))
         return insts
 
+    # ------------------------------------------------------------------ video
+    def upload_video(self, video_path: str | Path) -> tuple[str, int]:
+        """Upload once, reuse the file_id for every concept prompt."""
+        video_path = str(video_path)
+        if not hasattr(self, "_uploads"):
+            self._uploads = {}
+        if video_path not in self._uploads:
+            cap = cv2.VideoCapture(video_path)
+            n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            cap.release()
+            if n > 15000:
+                raise ValueError(f"{video_path}: {n} frames > 15,000 frame limit per request; cut the clip")
+            with open(video_path, "rb") as f:
+                up = with_retries(lambda: self.client.files.create(file=f, purpose="user_data"))
+            self._uploads[video_path] = (up.id, n)
+        return self._uploads[video_path]
+
     def segment_video(self, video_path: str | Path, phrase: str) -> dict[int, list[Instance]]:
-        """Track a concept through an MP4/MOV clip (<= 15k frames, <= 16 objects/frame)."""
-        with open(video_path, "rb") as f:
-            up = with_retries(lambda: self.client.files.create(file=f, purpose="user_data"))
+        """Track a concept through an MP4/MOV clip (<= 15k frames, <= 16 objects/frame). Billed per frame (min 50)."""
+        cp = None
+        if self.cache_dir:
+            h = hashlib.sha256(Path(video_path).read_bytes()).hexdigest()
+            cp = self.cache_dir / "video" / f"{hashlib.sha256((h + '|' + phrase).encode()).hexdigest()}.pkl"
+            if cp.exists():
+                return pickle.loads(cp.read_bytes())
+        file_id, n = self.upload_video(video_path)
+        METER.reserve("sam-3.1/video_frame", max(50, n))
         payload = {
             "model": self.model,
             "input": [
                 {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": phrase}, {"type": "input_video", "file_id": up.id}],
+                    "content": [{"type": "input_text", "text": phrase}, {"type": "input_video", "file_id": file_id}],
                 }
             ],
             "metadata": {"include_confidence": "true", "mask_encoding": "one_bit"},
@@ -189,14 +217,59 @@ class MetaApiSam(SamBackend):
             return "".join(chunks)
 
         text = with_retries(run)
-        cap = cv2.VideoCapture(str(video_path))
-        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        cap.release()
-        METER.add("sam-3.1/video_frame", max(50, n))
+        METER.add("sam-3.1/video_frame", max(50, n), note=f"video '{phrase}'")
         by_frame: dict[int, list[Instance]] = {}
-        for inst in parse_sam_output(text, video=True, phrase=phrase, backend=self.name):
+        for inst in parse_sam_output(text, video=True, phrase=phrase, backend=self.name + "/video"):
             by_frame.setdefault(inst.frame_index or 0, []).append(inst)
+        if cp:
+            cp.parent.mkdir(parents=True, exist_ok=True)
+            cp.write_bytes(pickle.dumps(by_frame))
         return by_frame
+
+    def segment_images_as_video(self, images: list[np.ndarray], phrases: list[str], work_dir: str | Path | None = None,
+                                size: tuple[int, int] = (1280, 960), sep_frames: int = 2, fps: float = 5.0) -> dict[str, list[list[Instance]]]:
+        """Label many images per request by packing them into one clip (video frames cost 1/12 of image calls).
+
+        Each image is letterboxed into `size`, followed by `sep_frames` black frames so tracks do not
+        carry across unrelated images. Returns {phrase: [instances for image 0, image 1, ...]}.
+        Note SAM 3.1 video tracks at most 16 objects per frame -- validate per phrase (02_autolabel --ab-check).
+        """
+        from ..viz.video import VideoWriter
+
+        from ..config import REPO_ROOT
+
+        work_dir = work_dir or REPO_ROOT / "cache" / "video_batches"
+        W, H = size
+        frames_per = 1 + sep_frames
+        if len(images) * frames_per > 15000:
+            raise ValueError("too many images for one clip; chunk them")
+        digest = hashlib.sha256("".join(frame_digest(im) for im in images).encode() + f"{size}{sep_frames}".encode()).hexdigest()[:24]
+        path = Path(work_dir) / f"batch_{digest}.mp4"
+        geo = []
+        for im in images:
+            h, w = im.shape[:2]
+            sc = min(W / w, H / h)
+            nw, nh = int(round(w * sc)), int(round(h * sc))
+            geo.append((sc, (W - nw) // 2, (H - nh) // 2, nw, nh))
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            black = np.zeros((H, W, 3), np.uint8)
+            with VideoWriter(path, fps, (W, H), crf=12) as vw:
+                for im, (sc, ox, oy, nw, nh) in zip(images, geo):
+                    canvas = black.copy()
+                    canvas[oy : oy + nh, ox : ox + nw] = cv2.resize(im, (nw, nh), interpolation=cv2.INTER_AREA)
+                    vw.write(canvas)
+                    for _ in range(sep_frames):
+                        vw.write(black)
+        out: dict[str, list[list[Instance]]] = {}
+        for p in phrases:
+            by_frame = self.segment_video(path, p)
+            per_image = []
+            for k, (sc, ox, oy, nw, nh) in enumerate(geo):
+                insts = by_frame.get(k * frames_per, [])
+                per_image.append([i.transformed((-ox / sc, -oy / sc), sc) for i in insts])
+            out[p] = per_image
+        return out
 
 
 def _output_text(resp) -> str:
