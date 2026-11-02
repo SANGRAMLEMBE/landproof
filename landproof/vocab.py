@@ -7,6 +7,7 @@ validation statistics measured against labeled frames.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,7 +34,11 @@ class HazardClass:
     @property
     def default_phrase(self) -> str:
         if self.stats:
-            return max(self.phrases, key=lambda p: self.stats.get(p, {}).get("iou", -1.0))
+            def iou(p):  # unvalidated phrases store iou=None; ties keep the listed order
+                v = self.stats.get(p, {}).get("iou")
+                return -1.0 if v is None else v
+
+            return max(self.phrases, key=iou)
         return self.phrases[0]
 
 
@@ -92,8 +97,11 @@ class Vocabulary:
                 for c in self.classes
             ]
         }
-        with open(path, "w") as f:
+        # atomic: a crash mid-dump must not leave a truncated file that load() then prefers
+        tmp = Path(path).with_suffix(".tmp")
+        with open(tmp, "w") as f:
             yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
+        os.replace(tmp, path)
 
     # ------------------------------------------------------------------ queries
     @property

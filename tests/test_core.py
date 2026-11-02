@@ -96,6 +96,29 @@ def test_verifier_pass_and_backend_error_is_not_absence(vocab, cfg):
     assert cert.verdict == "FAIL" and all(r.status == ClaimStatus.UNVERIFIABLE for r in cert.results)
 
 
+def test_default_phrase_with_unvalidated_stats():
+    from landproof.vocab import HazardClass
+
+    c = HazardClass("water", 4, 5.0, True, False, True, False, ["flood water", "pond", "puddle"],
+                    stats={"flood water": {"iou": None}, "pond": {"iou": 0.4}, "puddle": {"iou": None}})
+    assert c.default_phrase == "pond"
+    c.stats = {p: {"iou": None, "unvalidated": True} for p in c.phrases}  # class absent from the dataset
+    assert c.default_phrase == "flood water"
+
+
+def test_phrase_quality_is_yaml_safe(vocab):
+    import yaml
+
+    from landproof.data.autolabel import phrase_quality
+
+    rgb, label = _oracle_frame(vocab, person_at=(150, 190))
+    sam = OracleSam(vocab)
+    sam.register(rgb, label)
+    q = phrase_quality(rgb, label, "person", sam, vocab)
+    assert all(type(q[k]) is float for k in ("iou", "precision", "recall"))
+    yaml.safe_dump(q)  # numpy scalars raise RepresenterError (crashed 01_validate_vocab)
+
+
 def test_ledger_detects_tampering(tmp_path):
     led = Ledger(tmp_path / "l.jsonl")
     for i in range(5):

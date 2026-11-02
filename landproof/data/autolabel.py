@@ -123,9 +123,10 @@ def phrase_quality(rgb: np.ndarray, gt: np.ndarray, phrase: str, sam: SamBackend
     pred = union_mask(sam.segment(rgb, phrase), rgb.shape[:2]) & valid
     g = (gt == cid) & valid
     tp = float((pred & g).sum())
+    # plain floats: numpy scalars break yaml.safe_dump in 01_validate_vocab
     return {
-        "iou": iou(pred, g) if (pred | g).any() else float("nan"),
-        "precision": tp / pred.sum() if pred.sum() else float("nan"),
-        "recall": tp / g.sum() if g.sum() else float("nan"),
+        "iou": float(iou(pred, g)) if (pred | g).any() else float("nan"),
+        "precision": tp / float(pred.sum()) if pred.sum() else float("nan"),
+        "recall": tp / float(g.sum()) if g.sum() else float("nan"),
         "gt_px": int(g.sum()),
     }

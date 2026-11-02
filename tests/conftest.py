@@ -1,13 +1,14 @@
 import pytest
 
-from landproof.config import load_config
+from landproof.config import CONFIG_DIR, load_config
 from landproof.sim.scene import make_world
 from landproof.vocab import Vocabulary
 
 
 @pytest.fixture(scope="session")
 def vocab():
-    return Vocabulary.load()
+    # the raw vocabulary, so tests do not depend on what a paid 01_validate_vocab run kept
+    return Vocabulary.load(CONFIG_DIR / "hazards.yaml")
 
 
 @pytest.fixture(scope="session")
