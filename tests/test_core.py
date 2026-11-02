@@ -96,6 +96,18 @@ def test_verifier_pass_and_backend_error_is_not_absence(vocab, cfg):
     assert cert.verdict == "FAIL" and all(r.status == ClaimStatus.UNVERIFIABLE for r in cert.results)
 
 
+def test_mandatory_class_checked_with_best_phrase(vocab, cfg):
+    rgb, label = _oracle_frame(vocab, person_at=(150, 290))
+    sam = OracleSam(vocab)
+    sam.register(rgb, label)
+    water = vocab.by_name["water"]
+    weak = next(p for p in water.phrases if p != water.default_phrase)
+    claims = [HazardClaim(claim_id="c0", zone_id="Z1", phrase=weak, hazard_class="water")]
+    cert = Verifier(vocab, sam, cfg, None).verify_zone(rgb, Zone("Z1", (150.0, 150.0), 2.0, 20.0, 5.0, 1.0, True), claims, 0.1, 30.0, t=0.0)
+    assert "water" in cert.mandatory_added
+    assert {r.claim.phrase for r in cert.results if r.claim.hazard_class == "water"} == {weak, water.default_phrase}
+
+
 def test_default_phrase_with_unvalidated_stats():
     from landproof.vocab import HazardClass
 

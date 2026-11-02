@@ -58,10 +58,12 @@ class Verifier:
 
     # ------------------------------------------------------------------
     def mandatory_claims(self, zone_id: str, existing: list[HazardClaim]) -> list[HazardClaim]:
-        covered = {c.hazard_class for c in existing}
+        # a mandatory class is covered only by its best validated phrase: a weaker phrase the
+        # LLM chose ("puddle") must not be the sole evidence that a class (water) is absent
+        covered = {c.phrase for c in existing}
         added = []
         for hc in self.vocab.mandatory_classes:
-            if hc.name not in covered:
+            if hc.default_phrase not in covered:
                 added.append(
                     HazardClaim(
                         claim_id=f"{zone_id}-m-{hc.name}",
