@@ -50,6 +50,7 @@ def main():
     ap.add_argument("--root")
     ap.add_argument("--split", default="test")
     ap.add_argument("--n", type=int, default=60)
+    ap.add_argument("--offset", type=int, default=0, help="skip the first N samples (e.g. ICG frames used by 01_validate_vocab)")
     ap.add_argument("--gsd", type=float, default=None)
     ap.add_argument("--evidence", default="oracle")
     ap.add_argument("--planner", default="scripted", choices=["spark", "scripted"])
@@ -63,7 +64,7 @@ def main():
     else:
         gsd0 = a.gsd or DEFAULT_GSD[a.source]
         frames = []
-        for s in [s for s in list_samples(a.source, a.root, a.split) if s.label_path][: a.n]:
+        for s in [s for s in list_samples(a.source, a.root, a.split) if s.label_path][a.offset : a.offset + a.n]:
             src = load_rgb(s.image_path)
             rgb, lab, gsd = camera_frame(src, load_label(s, vocab, src.shape[:2]), gsd0, cam.width, cam.height)
             frames.append(Frame(s.sample_id, rgb, lab, gsd, cam.altitude_for_gsd(gsd, rgb.shape[1]), a.source))

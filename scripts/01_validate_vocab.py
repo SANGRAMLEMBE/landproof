@@ -12,6 +12,7 @@ import argparse
 import json
 import math
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +36,7 @@ def main():
     ap.add_argument("--evidence", default="meta-api")
     ap.add_argument("--max-side", type=int, default=1536)
     ap.add_argument("--merge", action="store_true", help="merge with an existing hazards.validated.yaml")
+    ap.add_argument("--workers", type=int, default=6, help="parallel SAM calls per frame")
     a = ap.parse_args()
     cfg = load_config()
     vocab = Vocabulary.load(CONFIG_DIR / "hazards.yaml")
@@ -51,10 +53,10 @@ def main():
         rgb = load_rgb(s.image_path, a.max_side)
         gt = load_label(s, vocab, rgb.shape[:2])
         present = set(np.unique(gt).tolist())
-        for p in vocab.all_phrases:
-            if vocab.class_of(p).id not in present:
-                continue  # only score phrases whose class appears in this frame
-            acc[p].append(phrase_quality(rgb, gt, p, sam, vocab))
+        todo = [p for p in vocab.all_phrases if vocab.class_of(p).id in present]  # only phrases whose class appears in this frame
+        with ThreadPoolExecutor(a.workers) as ex:
+            for p, q in zip(todo, ex.map(lambda p: phrase_quality(rgb, gt, p, sam, vocab), todo)):
+                acc[p].append(q)
         print(f"  {s.sample_id}: done ({METER.report()})")
 
     prev = None
