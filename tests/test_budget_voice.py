@@ -21,6 +21,31 @@ def test_budget_blocks_before_overspend(tmp_path):
     assert Budget(tmp_path / "spend.json", cap_usd=1.0).total == pytest.approx(0.75)
 
 
+def test_retries_dropped_connection_but_not_client_errors(monkeypatch):
+    from landproof.meta import client
+
+    monkeypatch.setattr(client.time, "sleep", lambda s: None)
+
+    class APIConnectionError(Exception):  # openai's name; no status_code, the request never got a response
+        pass
+
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise APIConnectionError("Connection error.")
+        return "ok"
+
+    assert client.with_retries(flaky) == "ok" and len(calls) == 3
+
+    class BadRequest(Exception):
+        status_code = 400
+
+    with pytest.raises(BadRequest):
+        client.with_retries(lambda: (_ for _ in ()).throw(BadRequest()))
+
+
 def test_video_mode_is_cheaper():
     img = estimate_usd(300, ["a"] * 20, [], 50)
     vid = estimate_usd(300, [], ["a"] * 20, 50)

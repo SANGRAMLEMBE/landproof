@@ -41,7 +41,8 @@ def with_retries(fn, *, attempts: int = 5, base_delay: float = 1.5, retry_on=(42
             return fn()
         except Exception as e:  # openai.APIStatusError, requests.HTTPError, timeouts
             status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
-            transient = status in retry_on or status is None and "timeout" in type(e).__name__.lower()
+            # no status = never reached the server: timeouts and dropped connections are transient too
+            transient = status in retry_on or status is None and any(k in type(e).__name__.lower() for k in ("timeout", "connection"))
             if not transient or i == attempts - 1:
                 raise
             last = e
