@@ -16,7 +16,7 @@ Nov 3 is the last troubleshooting day.
 6. VS Code: Ctrl+Shift+P → "Python: Select Interpreter" → `.venv`. The Run and Debug panel (Ctrl+Shift+D) has ready configurations: *Check Meta API access*, *Show spend*, *Offline demo*, *Atlas: Muse Spark + SAM 3.1*, *Demo: real Meta models in the simulator*, *Tests*.
 7. Always run commands from the repo root (caches go to `cache/`, outputs to `runs/`).
 
-If something fails on a live API call, copy the traceback (it never contains your key) and send it to Claude.
+If something fails on a live API call, copy the traceback (it never contains your key) and share it with the team.
 
 ## Saturday Oct 31 (tonight): go/no-go
 
